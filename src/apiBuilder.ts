@@ -1,5 +1,7 @@
 import api from '.'
 
+const prefixAPI = 'http://localhost:3000'
+
 /**
  * 
  * @param initialArray should be provided with initialization if used from a Vue component
@@ -8,6 +10,8 @@ import api from '.'
 export function buildProxyREST(initialArray = []) {
   const isTest = process.env.NODE_ENV !== 'test'
 
+  const fetchJs = (u, o = undefined) => fetch(u, o).then(r => r.ok ? r.json() : r)
+
   const handler = {
     get: function(target, name) {
       return name in target ? target[name] : null
@@ -15,6 +19,7 @@ export function buildProxyREST(initialArray = []) {
   }
 
   const originalPush = initialArray.push
+  const originalSplice = initialArray.splice
 
   const base = new Proxy(initialArray, handler) as Array<Object>
 
@@ -34,7 +39,7 @@ export function buildProxyREST(initialArray = []) {
   // isTest && 
   Object.assign(base, {
     ok: false,
-    async push(element, el2) {
+    async push(element, cb) {
       // if (this.ok) {debugger}
       return originalPush.apply(initialArray, [element])
       // return initialArray.push.apply(initialArray, [element])
@@ -46,9 +51,11 @@ export function buildProxyREST(initialArray = []) {
     },
     async splice(...args) {
       options.inst && options.inst.$emit(`update:${options.propName}`, base)
-      return Array.prototype.splice.apply(base, args)
+      return originalSplice.apply(initialArray, args)
     },
     async get() {
+      const resp = await fetchJs(`${prefixAPI}/api/products`)
+      return resp
       return Promise.resolve([{}, {}])
     },
   })
