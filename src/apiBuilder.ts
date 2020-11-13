@@ -1,6 +1,10 @@
 import api from '.'
 
-const prefixAPI = 'http://localhost:3000'
+const prefixAPI = 'http://localhost:1337'
+
+const headers = {
+  'Content-Type': 'application/json'
+}
 
 /**
  * 
@@ -10,12 +14,17 @@ const prefixAPI = 'http://localhost:3000'
 export function buildProxyREST(initialArray = []) {
   const isTest = process.env.NODE_ENV !== 'test'
 
-  const fetchJs = (u, o = undefined) => fetch(u, o).then(r => r.ok ? r.json() : r)
+  const fetchJs = (input: RequestInfo, init?: RequestInit | undefined) =>
+    fetch(input, init).then(r => r.ok ? r.json() : r)
 
   const handler = {
     get: function(target, name) {
       return name in target ? target[name] : null
-    }
+    },
+    _set() {
+      console.info('setting :)')
+      debugger
+    },
   }
 
   const originalPush = initialArray.push
@@ -39,9 +48,17 @@ export function buildProxyREST(initialArray = []) {
   // isTest && 
   Object.assign(base, {
     ok: false,
-    async push(element, cb) {
+    async push(...elements) {
       // if (this.ok) {debugger}
-      return originalPush.apply(initialArray, [element])
+      // debugger
+      const r = await fetchJs(`${prefixAPI}/products`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(elements[0]),
+      })
+      // TODO catch and undo if an error
+      return originalPush.apply(initialArray, [r])
+      // return originalPush.apply(initialArray, [...elements])
       // return initialArray.push.apply(initialArray, [element])
       // return Array.prototype.push.apply(initialArray, [element])
       // return Array.prototype.push.call(base, elements)
@@ -49,12 +66,24 @@ export function buildProxyREST(initialArray = []) {
       // return [].prototype.push.call(initialArray, elements)
       // return initialArray.prototype.push.call([], elements)
     },
-    async splice(...args) {
+    async splice(i, n) {
+      if(i !== undefined && n) {
+      const [idx, pKey = 'id'] = [i]// [...args]
+      const object = initialArray[idx]
+      // debugger
+      const r = await fetch(`${prefixAPI}/products/${object[pKey]}`, {
+        method: 'DELETE',
+        // headers,
+      })
+      // TODO catch and undo if an error
       options.inst && options.inst.$emit(`update:${options.propName}`, base)
-      return originalSplice.apply(initialArray, args)
+      }
+      return originalSplice.apply(initialArray, [i, n])
     },
     async get() {
-      const resp = await fetchJs(`${prefixAPI}/api/products`)
+      const resp = await fetchJs(`${prefixAPI}/products`)
+      originalSplice.call(initialArray, 0)
+      originalPush.apply(initialArray, [...resp])
       return resp
       return Promise.resolve([{}, {}])
     },
