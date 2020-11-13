@@ -1,6 +1,11 @@
-  import api from '.'
+import api from '.'
 
-export function buildProxyREST() {
+/**
+ * 
+ * @param initialArray should be provided with initialization if used from a Vue component
+ */
+
+export function buildProxyREST(initialArray = []) {
   const isTest = process.env.NODE_ENV !== 'test'
 
   const handler = {
@@ -9,7 +14,9 @@ export function buildProxyREST() {
     }
   }
 
-  const base = new Proxy([], handler)
+  const originalPush = initialArray.push
+
+  const base = new Proxy(initialArray, handler) as Array<Object>
 
   const options = {
     propName: undefined,
@@ -26,8 +33,16 @@ export function buildProxyREST() {
 
   // isTest && 
   Object.assign(base, {
-    async push(...elements) {
-      return Array.prototype.push.apply(base, elements)
+    ok: false,
+    async push(element, el2) {
+      // if (this.ok) {debugger}
+      return originalPush.apply(initialArray, [element])
+      // return initialArray.push.apply(initialArray, [element])
+      // return Array.prototype.push.apply(initialArray, [element])
+      // return Array.prototype.push.call(base, elements)
+      // return [].prototype.push.call(base, elements)
+      // return [].prototype.push.call(initialArray, elements)
+      // return initialArray.prototype.push.call([], elements)
     },
     async splice(...args) {
       options.inst && options.inst.$emit(`update:${options.propName}`, base)
@@ -42,7 +57,7 @@ export function buildProxyREST() {
   base.setPropName = setPropName
   base.setInstance = setInstance
   
-  return base
+  return base // as Array<Object>
 
   return {
     default: base, // always first, so array destruction works fine
